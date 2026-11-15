@@ -1,0 +1,6 @@
+build/
+*.npy
+.DS_Store
+__pycache__/
+submission/*.mp4
+submission/*.mov
