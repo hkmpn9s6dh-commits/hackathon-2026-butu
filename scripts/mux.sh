@@ -19,7 +19,7 @@ echo "响度测量：I=$I TP=$TP LRA=$LRA TH=$TH"
 
 # 第二遍：按测量值线性归一 + 限幅
 ffmpeg -y -v error -i "$V" -i "$A" \
-  -af "loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=$I:measured_TP=$TP:measured_LRA=$LRA:measured_thresh=$TH:linear=true,aresample=48000" \
+  -af "acompressor=threshold=-20dB:ratio=2.6:attack=6:release=260:makeup=3, loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=$I:measured_TP=$TP:measured_LRA=$LRA:measured_thresh=$TH:linear=true, aresample=48000" \
   -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -ar 48000 -ac 2 \
   -movflags +faststart -shortest "$OUT"
 

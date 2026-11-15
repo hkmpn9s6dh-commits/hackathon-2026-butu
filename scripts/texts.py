@@ -18,9 +18,15 @@ END = [
     "2026「兴光」AIGC 短视频大赛 参赛作品",
 ]
 
-# 片中所有地名/年份/幕标/字幕/角标，全部收进字体子集
+# 片中所有地名/年份/幕标/字幕/角标，全部收进字体子集。
+# 关键：幕标/年份/地点直接从 story.SHOTS 里取，不另立一份清单——
+# 另立清单就会漏字（2026-11-15 实测：改了场景标注，字体子集里没有「斋翠润轩」，成片出现豆腐块）。
 def all_text():
     parts = list(story.VO.values()) + ACTS + YEARS + PLACES + OPEN + END
+    for sh in story.SHOTS:
+        for k in ("act", "year", "place"):
+            if sh.get(k):
+                parts.append(sh[k])
     parts += [story.TITLE, story.SUBTITLE, story.BADGE]
     parts += ["0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"]
     parts += list("，。、；：？！「」『』《》〈〉（）—…·％%+-/0123456789 ")

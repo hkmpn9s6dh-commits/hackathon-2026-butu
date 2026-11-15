@@ -195,9 +195,26 @@ class HUD:
 
     def badge(self):
         if "badge" not in self.cache:
-            self.cache["badge"] = text_layer([story.BADGE], 22, "Light", (255, 255, 255),
-                                             175, stroke=2, stroke_color=(0, 0, 0), tracking=0.5)
+            self.cache["badge"] = text_layer([story.BADGE], 23, "Regular", (255, 255, 255),
+                                             232, stroke=1, stroke_color=(0, 0, 0), tracking=0.5)
         return self.cache["badge"]
+
+    def tag(self):
+        """右下角实心标签：四角可辨，不靠细笔画。"""
+        if "tag" not in self.cache:
+            txt = "AI 生成"
+            f = F(24, "Medium")
+            w = int(f.getlength(txt)) + 40
+            h = 46
+            im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.rounded_rectangle([0, 0, w - 1, h - 1], radius=8, fill=(0, 0, 0, 150),
+                                outline=(255, 255, 255, 120), width=1)
+            b = f.getbbox(txt)
+            d.text(((w - (b[2] - b[0])) / 2 - b[0], (h - (b[3] - b[1])) / 2 - b[1]),
+                   txt, font=f, fill=(255, 255, 255, 240))
+            self.cache["tag"] = im
+        return self.cache["tag"]
 
 
 def paste(canvas_pil, layer, xy, opacity=1.0):
@@ -221,6 +238,7 @@ def card_open(tl_time, dur):
     fade = smooth((tl_time - 0.4) / 1.4) * smooth((dur - tl_time) / 0.9)
     paste(a, t1, ((W - t1.width) / 2, H * 0.44 - t1.height / 2), fade)
     paste(a, t2, ((W - t2.width) / 2, H * 0.44 + 64), fade * 0.9)
+    paste(a, HUD().tag(), (W - 120 - HUD().tag().width, H - 72), 0.95)
     pil = Image.alpha_composite(pil.convert("RGBA"), a).convert("RGB")
     return np.asarray(pil).astype(np.float32) / 255.0
 
@@ -237,6 +255,7 @@ def card_title(plates, tl_time, dur):
     paste(a, t, ((W - t.width) / 2, H * 0.36), fade)
     s = text_layer([story.SUBTITLE], 40, "Light", (255, 255, 255), 190, tracking=3)
     paste(a, s, ((W - s.width) / 2, H * 0.36 + t.height + 26), fade * smooth((tl_time - 0.9) / 1.2))
+    paste(a, HUD().tag(), (W - 120 - HUD().tag().width, H - 72), 0.95)
     pil = Image.alpha_composite(pil.convert("RGBA"), a).convert("RGB")
     return np.asarray(pil).astype(np.float32) / 255.0
 
@@ -256,6 +275,7 @@ def card_end(tl_time, dur):
         lay = text_layer([txt], sz, wt, (255, 255, 255), al, tracking=tr)
         paste(a, lay, ((W - lay.width) / 2, y), fade)
         y += lay.height + (34 if i == 0 else 16)
+    paste(a, HUD().tag(), (W - 120 - HUD().tag().width, H - 72), 0.95)
     pil = Image.alpha_composite(pil.convert("RGBA"), a).convert("RGB")
     return np.asarray(pil).astype(np.float32) / 255.0
 
@@ -291,6 +311,10 @@ def shot_image(shot, tl, plates, tlocal, hud, clips=None):
         _, (dx, dy), z = shot["move"]
         p = ease_io(tlocal / max(dur, 0.001)) - 0.5
         panx, pany = dx * p * 2, dy * p * 2
+    sh = shot.get("shake", 0.0)
+    if sh:
+        panx += sh * (math.sin(tlocal * 2.3 + 1.1) + 0.6 * math.sin(tlocal * 5.7))
+        pany += sh * (math.sin(tlocal * 1.9 + 2.4) + 0.6 * math.sin(tlocal * 4.9 + 0.7))
     img = crop_to_frame(plates.get(shot["plate"]), z, panx, pany)
 
     if shot.get("reveal"):          # 舆图从绢纹里「长」出来
@@ -303,6 +327,9 @@ def shot_image(shot, tl, plates, tlocal, hud, clips=None):
         img = base * (1 - m) + img * m
 
     preset, strength = (shot.get("grade") or ("neutral", 1.0))
+    c = shot.get("contrast")
+    if c:
+        img = (img - 0.5) * c + 0.5
     fl = 1.0
     if preset == "fire":
         fl = 1.0 + 0.045 * math.sin(tlocal * 17.3) * math.sin(tlocal * 5.1)
@@ -312,21 +339,24 @@ def shot_image(shot, tl, plates, tlocal, hud, clips=None):
 
 def finish_frame(img, shot, tl, tlocal, hud):
     dur = shot["dur"]
-    img = img * FILM[(int(tlocal * FPS) * 7) % len(FILM)]
+    if shot.get("clean"):
+        img = img * VIGNETTE
+    else:
+        img = img * FILM[(int(tlocal * FPS) * 7) % len(FILM)]
 
     # ---- 字
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 
     if shot.get("act"):
-        act = hud.small(shot["act"], 32, "Medium", 215, tracking=4)
+        act = hud.small(shot["act"], 34, "Medium", 238, tracking=5)
         fade = smooth(tlocal / 0.9) * smooth((dur - tlocal) / 0.9)
         paste(ov, act, (120, 92), fade)
     if shot.get("year"):
-        yr = hud.small(shot["year"], 32, "Light", 165, tracking=6)
+        yr = hud.small(shot["year"], 33, "Regular", 190, tracking=6)
         fade = smooth(tlocal / 0.9) * smooth((dur - tlocal) / 0.9)
         paste(ov, yr, (W - 120 - yr.width, 92), fade)
     if shot.get("place"):
-        pl = hud.small(shot["place"], 28, "Light", 150, tracking=2)
+        pl = hud.small(shot["place"], 28, "Light", 185, tracking=2)
         fade = smooth((tlocal - 0.8) / 1.0) * smooth((dur - tlocal) / 0.8)
         paste(ov, pl, (120, H - 126), fade)
     if shot.get("sub"):
@@ -337,7 +367,9 @@ def finish_frame(img, shot, tl, tlocal, hud):
             paste(ov, sub, ((W - sub.width) / 2, story.SUB_Y - sub.height), min(a1, a2))
 
     badge = hud.badge()
-    paste(ov, badge, (120, H - 64), 0.70)
+    paste(ov, badge, (120, H - 64), 0.90)
+    tag = hud.tag()
+    paste(ov, tag, (W - 120 - tag.width, H - 72), 0.95)
 
     img = img + DITHER / 255.0
     return blend_layer(img, ov)

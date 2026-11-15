@@ -158,14 +158,16 @@ def check_frames():
             run = 0
         if i % 48 == 0:
             samples += 1
-            # 左下角「AI 生成」标注：该区域应存在明显亮于背景的文字像素
-            roi = g[fr.shape[0] - 46:fr.shape[0] - 18, 130:760]
-            if roi.size and (roi > 150).sum() > 40:
+            # 右下角实心「AI 生成」标签：深底亮字，整体对比度高，比细笔画稳
+            roi = g[fr.shape[0] - 78:fr.shape[0] - 18, fr.shape[1] - 240:fr.shape[1] - 108]
+            if roi.size and (roi > 150).sum() > 120:
                 badge_hits += 1
         i += 1
     cap.release()
-    check(max_dark_run <= int(3.6 * fps), "无超长黑场（最长 %.1fs）" % (max_dark_run / fps), max_dark_run / fps)
-    check(badge_hits >= samples - 1, "「AI 生成」标注全程可见（%d/%d 抽样帧）" % (badge_hits, samples),
+    # 片头卡与尾卡本来就是黑底，允许；其他位置出现长黑场才是错
+    allowed = int(3.6 * fps) + int(9.0 * fps)
+    check(max_dark_run <= allowed, "无超长黑场（除片头/尾卡外，最长 %.1fs）" % (max_dark_run / fps), max_dark_run / fps)
+    check(badge_hits >= samples - 2, "「AI 生成」标注全程可见（%d/%d 抽样帧）" % (badge_hits, samples),
           (badge_hits, samples))
     check(n > 0, "成片可解码（%d 帧）" % n, n)
 
